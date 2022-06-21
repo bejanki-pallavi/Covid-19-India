@@ -1,32 +1,34 @@
 const express = require("express");
-const path = require("path");
-
 const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
+const path = require("path");
+
+const databasePath = path.join(__dirname, "covid19India.db");
+
 const app = express();
 
 app.use(express.json());
 
-const dbPath = path.join(__dirname, "covid19India.db");
+let database = null;
 
-let db = null;
-
-const initializeDBAndServer = async () => {
+const initializeDbAndServer = async () => {
   try {
-    db = await open({
-      filename: dbPath,
+    database = await open({
+      filename: databasePath,
       driver: sqlite3.Database,
     });
-    app.listen(3000, () => {
-      console.log("Server Running at http://localhost:3000/");
-    });
-  } catch (e) {
-    console.log(`DB Error: ${e.message}`);
+
+    app.listen(3000, () =>
+      console.log("Server Running at http://localhost:3000/")
+    );
+  } catch (error) {
+    console.log(`DB Error: ${error.message}`);
     process.exit(1);
   }
 };
 
-initializeDBAndServer();
+initializeDbAndServer();
+
 const convertStateDbObjectToResponseObject = (dbObject) => {
   return {
     stateId: dbObject.state_id,
@@ -46,6 +48,7 @@ const convertDistrictDbObjectToResponseObject = (dbObject) => {
     deaths: dbObject.deaths,
   };
 };
+
 app.get("/states/", async (request, response) => {
   const getStatesQuery = `
     SELECT
@@ -59,4 +62,32 @@ app.get("/states/", async (request, response) => {
     )
   );
 });
+
+//api 2 get
+app.get("/states/:stateId/", async (request, response) => {
+  const { stateId } = request.params;
+  const getStateQuery = `
+    SELECT 
+      *
+    FROM 
+      state 
+    WHERE 
+      state_id = ${stateId};`;
+  const state = await database.get(getStateQuery);
+  response.send(convertStateDbObjectToResponseObject(state));
+});
+
+// //api 3 post
+// app.post("/districts/", async (request, response) => {
+ 
+//     const { stateId, districtName, cases, cured, active, deaths } = request.body;
+//     const postDistrictQuery = `
+//     INSERT INTO
+//       district (state_id, district_name, cases, cured, active, deaths)
+//     VALUES
+//       (${stateId}, '${districtName}', ${cases}, ${cured}, ${active}, ${deaths});`;
+//     await database.run(postDistrictQuery);
+//     response.send("District Successfully Added");
+// });
+
 module.exports = app;
